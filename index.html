@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>STEM AVERY MERCEDE - ULTIMATE LEVELS</title>
+<style>
+body{
+    margin:0;
+    background:black;
+    color:#00ffcc;
+    font-family:Arial, monospace;
+    overflow:hidden;
+}
+canvas{
+    display:block;
+    margin:auto;
+    background:black;
+}
+#hud{
+    position:absolute;
+    top:10px;
+    left:10px;
+    font-size:18px;
+}
+#restartBtn{
+    position:absolute;
+    top:50%;
+    left:50%;
+    transform:translate(-50%, -50%);
+    display:none;
+    padding:15px 25px;
+    font-size:20px;
+    cursor:pointer;
+    background:#00ffcc;
+    border:none;
+}
+</style>
+</head>
+<body>
+
+<div id="hud">
+Score: <span id="score">0</span> | Level: <span id="level">1</span> | Boss HP: <span id="bossHP">100</span> | Health: <span id="health">3</span>
+</div>
+
+<button id="restartBtn" onclick="restartGame()">Restart</button>
+
+<canvas id="gameCanvas" width="800" height="500"></canvas>
+
+<script>
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+let rocket = {x: canvas.width/2, y: canvas.height-100};
+let bullets = [];
+let minions = [];
+let score = 0;
+let health = 3;
+let level = 1;
+let maxLevel = 10;
+let boss = {x: canvas.width/2, y:100, size:60, hp:100};
+let gameOver = false;
+let bossBullets = []; // store bullets fired by the boss
+const restartBtn = document.getElementById("restartBtn");
+
+// Mouse controls
+document.addEventListener("mousemove", (e)=>{ rocket.x = e.clientX; });
+document.addEventListener("mousedown", (e)=>{ if(e.button===0) bullets.push({x:rocket.x, y:rocket.y}); });
+
+// Spawn minions for current level
+function spawnMinions(level){
+    minions = [];
+    let count = Math.min(100 * Math.pow(100, level-1), 20);
+    for(let i=0; i<count; i++){
+        minions.push({
+            x: Math.random() * (canvas.width-40)+20,
+            y: -Math.random()*canvas.height,
+            size:15,
+            speed: 1+Math.random()*2
+        });
+    }
+}
+
+// Setup boss HP for level
+function setupBoss(level){
+    boss.hp = Math.floor(100 + (level-1)*(3000-100)/(maxLevel-1)); // scales to 3000 at level 10
+    document.getElementById("bossHP").innerText = boss.hp;
+    spawnMinions(level);
+}
+// Boss multi-shot attack
+function bossShoot(){
+    if(gameOver) return;
+    // Fire 3 bullets in a spread pattern
+    const spread = [-15,0,15]; // horizontal offsets
+    spread.forEach(offset => {
+        bossBullets.push({
+            x: boss.x + offset,
+            y: boss.y,
+            speedY: 4,
+            speedX: offset/10 // slight horizontal movement
+        });
+    });
+}
+setInterval(bossShoot, 1000); // boss fires every second
+// Initialize first boss
+setupBoss(level);
+
+// Game loop
+function draw(){
+    if(gameOver){
+        restartBtn.style.display="block";
+        ctx.fillStyle="red";
+        ctx.font="50px Arial";
+        ctx.fillText("GAME OVER", canvas.width/2-150, canvas.height/2);
+        return;
+    }
+
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+
+    // Rocket
+    ctx.fillStyle="#00ffcc";
+    ctx.beginPath();
+    ctx.moveTo(rocket.x, rocket.y);
+    ctx.lineTo(rocket.x-15, rocket.y+30);
+    ctx.lineTo(rocket.x+15, rocket.y+30);
+    ctx.closePath();
+    ctx.fill();
+
+    // Boss
+    ctx.fillStyle="purple";
+    ctx.beginPath();
+    ctx.arc(boss.x, boss.y, boss.size,0,Math.PI*2);
+    ctx.fill();
+
+    // Boss movement
+    boss.x += Math.sin(Date.now()/500)*3;
+
+    // Bullets
+    ctx.fillStyle="yellow";
+    bullets.forEach((b,i)=>{
+        b.y -=10;
+        ctx.fillRect(b.x-2, b.y, 4,10);
+
+        // Collision with boss
+        let dx = b.x - boss.x;
+        let dy = b.y - boss.y;
+        let distance = Math.sqrt(dx*dx + dy*dy);
+        if(distance < boss.size){
+            boss.hp--;
+            document.getElementById("bossHP").innerText = boss.hp;
+            bullets.splice(i,1);
+        }
+    });
+// Boss bullets
+ctx.fillStyle="red";
+bossBullets.forEach((b,i)=>{
+    b.x += b.speedX;
+    b.y += b.speedY;
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, 5,0,Math.PI*2);
+    ctx.fill();
+
+    // Collision with rocket
+    let dx = b.x - rocket.x;
+    let dy = b.y - rocket.y;
+    let distance = Math.sqrt(dx*dx + dy*dy);
+    if(distance < 15){
+        health--;
+        document.getElementById("health").innerText = health;
+        bossBullets.splice(i,1);
+        if(health <= 0) gameOver = true;
+    }
+
+    // Remove offscreen bullets
+    if(b.y > canvas.height + 10 || b.x < 0 || b.x > canvas.width) bossBullets.splice(i,1);
+});
+    // Minions
+    ctx.fillStyle="red";
+    minions.forEach((m,i)=>{
+        m.y += m.speed;
+        ctx.beginPath();
+        ctx.arc(m.x, m.y, m.size,0,Math.PI*100
+        );
+        ctx.fill();
+
+        // Collision with rocket
+        let dx = m.x - rocket.x;
+        let dy = m.y - rocket.y;
+        let distance = Math.sqrt(dx*dx + dy*dy);
+        if(distance < m.size + 15
+        ){
+            health--;
+            document.getElementById("health").innerText = health;
+            minions.splice(i,1);
+            if(health<=0) gameOver=true;
+        }
+
+        // Remove offscreen minions
+        if(m.y > canvas.height + 50) minions.splice(i,1);
+    });
+
+    // Level up
+    if(boss.hp <=0){
+        score += level*100;
+        document.getElementById("score").innerText = score;
+        if(level < maxLevel){
+            level++;
+            document.getElementById("level").innerText = level;
+            setupBoss(level);
+        } else {
+            // Ultimate victory
+            ctx.fillStyle="lime";
+            ctx.font="50px Arial";
+            ctx.fillText("YOU WIN! 👑", canvas.width/2-150, canvas.height/2);
+            gameOver=true;
+        }
+    }
+
+    requestAnimationFrame(draw);
+}
+draw();
+
+// Restart function
+function restartGame(){
+    gameOver=false;
+    restartBtn.style.display="none";
+    score=0;
+    level=1;
+    health=3;
+    rocket.x = canvas.width/2;
+    document.getElementById("score").innerText = score;
+    document.getElementById("level").innerText = level;
+    document.getElementById("health").innerText = health;
+    setupBoss(level);
+}
+</script>
+</body>
+</html>
